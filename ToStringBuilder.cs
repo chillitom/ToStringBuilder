@@ -159,13 +159,23 @@ namespace Chillitom
             throw new Exception("ToStringBuilder not compiled");
         }
 
-
         private void AppendMember(MemberInfo memberInfo)
         {
             AppendQuotesIfRequiredForType(memberInfo);
 
-            var memberAppendMethod = typeof(StringBuilder).GetMethod("Append", new[] { GetMemberType(memberInfo) });
+            Type type = GetMemberType(memberInfo);
+            var memberAppendMethod = typeof(StringBuilder).GetMethod("Append", new[] { type });
             Expression getMemberValue = Expression.MakeMemberAccess(TargetArgExpression, memberInfo);
+            
+            if (type.IsValueType)
+            {
+                Type appendArgType = memberAppendMethod.GetParameters()[0].ParameterType;
+                if (type != appendArgType)
+                {
+                    getMemberValue = Expression.TypeAs(getMemberValue, typeof(object));
+                }
+            }
+
             _appendExpressions.Add(Expression.Call(SbArgExpression, memberAppendMethod, getMemberValue));
 
             AppendQuotesIfRequiredForType(memberInfo);
