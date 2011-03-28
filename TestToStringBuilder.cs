@@ -87,6 +87,15 @@ namespace Chillitom
             public E ChildObject = new E();
         }
 
+        public class G
+        {
+            public G()
+            {
+                DateTime = DateTime.Parse("2010-01-01 01:01:01");
+            }
+            public DateTime DateTime { get; set; }
+        }
+
         [Test]
         public void BasicFormatting()
         {
@@ -267,6 +276,20 @@ namespace Chillitom
             Assert.That(result, Is.EqualTo("F{ChildObject:E{PublicField:0,_privateField:1}}"));
         }
 
+        [Test]
+        public void NonPrimitiveValueTypes()
+        {
+            var target = new G();
+            var builder = new ToStringBuilder<G>()
+                .IncludeAllPublic()
+                .Compile();
+
+            var result = builder.Stringify(target);
+
+            Assert.That(result, Contains.Substring("01/01/2010 01:01:01"));
+        }
+
+
         [Test, ExpectedException(ExpectedMessage = "ToStringBuilder not compiled")]
         public void NonCompiledBuilderThrowsOnStringify()
         {
@@ -276,5 +299,4 @@ namespace Chillitom
             builder.Stringify(target);
         }
     }
-
 }
