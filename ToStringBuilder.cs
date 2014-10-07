@@ -28,8 +28,10 @@ namespace Chillitom
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using System.Runtime.Remoting.Messaging;
     using System.Text;
 
     public class ToStringBuilder<T> where T : class 
@@ -40,6 +42,7 @@ namespace Chillitom
         private static readonly ParameterExpression TargetArgExpression = Expression.Parameter(typeof(T), "target");
         private static readonly MethodInfo CharAppendMethodInfo = typeof(StringBuilder).GetMethod("Append", new[] { typeof(char) });
         private static readonly MethodInfo StringAppendMethodInfo = typeof(StringBuilder).GetMethod("Append", new[] { typeof(string) });
+        private static readonly MethodInfo GenericStringJoinMethod = typeof(string).GetGenericMethod("Join", new[] { typeof(string), typeof(IEnumerable<>) });
 
         private readonly List<MemberInfo> _members = new List<MemberInfo>();
         private readonly List<Expression> _appendExpressions = new List<Expression>();
@@ -166,7 +169,7 @@ namespace Chillitom
             Type type = GetMemberType(memberInfo);
             var memberAppendMethod = typeof(StringBuilder).GetMethod("Append", new[] { type });
             Expression getMemberValue = Expression.MakeMemberAccess(TargetArgExpression, memberInfo);
-            
+
             if (type.IsValueType)
             {
                 Type appendArgType = memberAppendMethod.GetParameters()[0].ParameterType;
@@ -174,10 +177,26 @@ namespace Chillitom
                 {
                     getMemberValue = Expression.TypeAs(getMemberValue, typeof(object));
                 }
+                _appendExpressions.Add(Expression.Call(SbArgExpression, memberAppendMethod, getMemberValue));
             }
+            else if (type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(List<>)))
+            {
+                // emit the equivalent of string.Join(", ", args), where args is IEnumerable<T>
+                AppendStartOfMembers();
 
-            _appendExpressions.Add(Expression.Call(SbArgExpression, memberAppendMethod, getMemberValue));
-
+                var genericStringJoinMethod = GenericStringJoinMethod.MakeGenericMethod(new[] { type.GetGenericArguments()[0] });
+                
+                getMemberValue = Expression.Call(genericStringJoinMethod, Expression.Constant(", "), getMemberValue);
+                
+                _appendExpressions.Add(Expression.Call(SbArgExpression, memberAppendMethod, getMemberValue));
+                
+                AppendEndOfMembers();
+            }
+            else
+            {
+                _appendExpressions.Add(Expression.Call(SbArgExpression, memberAppendMethod, getMemberValue));
+            }
+            
             AppendQuotesIfRequiredForType(memberInfo);
         }
 
@@ -263,6 +282,42 @@ namespace Chillitom
                 return ((PropertyInfo)memberInfo).PropertyType;
             }
             throw new Exception("illegal state, expecting property or field");
+        }
+    }
+    
+    // code to find a generic method on a Type, sourced from : http://stackoverflow.com/a/4036187/115734
+    static class ToStringHelper
+    {
+
+        private class SimpleTypeComparer : IEqualityComparer<Type>
+        {
+            public bool Equals(Type x, Type y)
+            {
+                return x.Assembly == y.Assembly &&
+                    x.Namespace == y.Namespace &&
+                    x.Name == y.Name;
+            }
+
+            public int GetHashCode(Type obj)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public static MethodInfo GetGenericMethod(this Type type, string name, Type[] parameterTypes)
+        {
+            var methods = type.GetMethods();
+            foreach (var method in methods.Where(m => m.Name == name))
+            {
+                var methodParameterTypes = method.GetParameters().Select(p => p.ParameterType).ToArray();
+
+                if (methodParameterTypes.SequenceEqual(parameterTypes, new SimpleTypeComparer()))
+                {
+                    return method;
+                }
+            }
+
+            return null;
         }
     }
 }
