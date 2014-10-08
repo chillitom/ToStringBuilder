@@ -24,6 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+using System.Collections.Generic;
+
 namespace Chillitom
 {
     using System;
@@ -31,7 +33,7 @@ namespace Chillitom
     using NUnit.Framework;
 
     [TestFixture]
-    public class TestToStringBuilder
+    public class ToStringBuilderTests
     {
         public class A
         {
@@ -94,6 +96,11 @@ namespace Chillitom
                 DateTime = DateTime.Parse("2010-01-01 01:01:01");
             }
             public DateTime DateTime { get; set; }
+        }
+
+        public class H
+        {
+            public List<string> Strings = new List<string>() {"Hello", "There"};
         }
 
         [Test]
@@ -298,5 +305,17 @@ namespace Chillitom
                 .Include(a => a.Prop);
             builder.Stringify(target);
         }
+
+        [Test]
+        public void ObjectContainingListOfStrings()
+        {
+            var target = new H();
+            var builder = new ToStringBuilder<H>().Include(h => h.Strings).Compile();
+
+            string result = builder.Stringify(target);
+            Assert.That(result, Is.EqualTo("H{Strings:{Hello, There}}"));
+        }
+
+        
     }
 }

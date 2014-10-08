@@ -1,6 +1,6 @@
 ToStringBuilder takes the tedium out of creating and maintaining ToString() methods yet the created code is super fast and refactor proof.  
 
-BSD licensed, just copy paste the code into your own projects and away you go.
+BSD licensed, just copy paste ToStringBuilder.cs into your own projects and away you go.
 
         public class Example
         {
